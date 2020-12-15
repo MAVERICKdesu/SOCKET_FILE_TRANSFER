@@ -1,0 +1,6 @@
+﻿  client.cpp
+c:\users\71465\desktop\network3-1\client\client\client.cpp(159): warning C4244: “初始化”: 从“unsigned __int64”转换到“int”，可能丢失数据
+c:\users\71465\desktop\network3-1\client\client\client.cpp(189): warning C4554: “^”: 检查运算符优先级是否存在的可能的错误；使用括号阐明优先级
+c:\users\71465\desktop\network3-1\client\client\client.cpp(221): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+  d:\windows kits\10\include\10.0.17763.0\um\winsock2.h(1831): note: 参见“inet_addr”的声明
+  client.vcxproj -> C:\Users\71465\Desktop\network3-1\client\Debug\client.exe
