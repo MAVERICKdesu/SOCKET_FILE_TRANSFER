@@ -1,4 +1,5 @@
 #include <Ws2tcpip.h>
+#include<stdlib.h>
 #include<stdio.h>
 #include<tchar.h>
 #include <iostream>
@@ -8,19 +9,19 @@
 #include <Ws2tcpip.h>
 #include <Windows.h>
 #include <ctime>
-#define RTO 0
+#define DELAY 20
 #define NAME "test.png"
 #define PACKSIZE 64
 using namespace std;
 #pragma comment(lib, "ws2_32.lib")
 WSAData wsd;
+HANDLE hMutex1;
 SOCKET server;
 char * pszRecv = NULL; //接收数据的数据缓冲区指针
 int nRet = 0;
-int dwSendSize = 0;
+int dwSendSize = 0, lastconf = -1;
 unsigned long long Time = 0;
 SOCKADDR_IN client, local;    //远程发送机地址和本机接收机地址
-
 const char sk1 = 0x01;
 const char sk2 = 0x02;
 const char sk3 = 0x04;
@@ -90,14 +91,44 @@ bool wave_hand()
 
 char** packtxt;
 bool sendstat[20000000];
-int lastconf = 0;
-int lentxt[20000000];
+int lentxt[20000000], big = 0;
+ofstream fout(NAME, ofstream::binary);
+DWORD WINAPI ackm(PVOID sockClient)
+{
+	WaitForSingleObject(hMutex1, INFINITE);
+	bool l = false;
+	int *x = (int *)sockClient;
+	int xh = *x;
+	if (xh > big) big = xh;
+	if (xh == lastconf + 1)
+		lastconf++;
+	else 
+	{
+		xh = lastconf;
+		l = true;
+	}
+	ack[1] = xh / 256, ack[2] = xh % 256 , ack[4] = cal_checksum(ack, 4);
+	sendto(server, ack, 5, 0, (SOCKADDR*)&client, sizeof(SOCKADDR));
+	if (!sendstat[xh] && !l)
+	{
+		packtxt[xh] = new char[nRet + 1];
+		lentxt[xh] = (int)pszRecv[3];
+		cout << "print pack" << xh << endl;
+		for (int i = 4; i < 4 + (int)pszRecv[3]; i++)
+			//packtxt[xh][i - 4] = pszRecv[i];
+			fout<<pszRecv[i];
+		//packtxt[xh][nRet] = '\0';
+		sendstat[xh] = true;
+	}
+	ReleaseMutex(hMutex1);
+	return 0;
+}
 
+int loss = 1;
 void recv_file()
 {
 	packtxt = new char*[5000000];
-	ofstream fout(NAME, ofstream::binary);
-	int big = 0,cnt=0;
+	int cnt=0;
 	while (true)
 	{
 		cnt++;
@@ -106,25 +137,14 @@ void recv_file()
 			break;
 		if (check_checksum(pszRecv, nRet))
 		{
+			loss++;
+			if (loss % 20 == 0)
+				continue;
 			int xh = ((unsigned char)pszRecv[2]) + ((unsigned char)pszRecv[1]) * 256;
-			if (xh > big) big = xh;
-			cout << "校验成功,返回ACK数据包 pack=" << xh << " txtlen=" <<(int) pszRecv[3]<< endl;
-			ack[1] = pszRecv[1], ack[2] = pszRecv[2],ack[4] = cal_checksum(ack, 4);
-			sendto(server, ack, 5, 0, (SOCKADDR*)&client, sizeof(SOCKADDR));
-			if (!sendstat[xh])
-			{
-				packtxt[xh] = new char[nRet+1];
-				lentxt[xh] = (int)pszRecv[3];
-				for (int i = 4; i < 4+ (int)pszRecv[3]; i++)
-					packtxt[xh][i-4]= pszRecv[i];
-				packtxt[xh][nRet] = '\0';
-				sendstat[xh] = true;
-			}
+			cout << "校验成功,返回ACK数据包 pack=" << xh << " txtlen=" << (int)pszRecv[3] << endl;
+			HANDLE hThread = CreateThread(NULL, NULL, ackm, (PVOID)&xh, 0, NULL);
 		}
 	}
-	for (int i = 0; i <= big; ++i)
-		for (int j = 0; j<lentxt[i]; ++j)
-			fout << packtxt[i][j];
 	cout << "cnt " << cnt << endl;
 	fout.close();
 }
@@ -144,7 +164,7 @@ int init()
 	}
 	int nPort = 5010;
 	local.sin_family = AF_INET;
-	local.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+	local.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");//("10.139.152.84");
 	local.sin_port = htons(nPort);
 	if (bind(server, (SOCKADDR*)&local, sizeof(local)) == SOCKET_ERROR) {
 		cout << "bind Error = " << WSAGetLastError() << endl;
@@ -175,6 +195,7 @@ int _tmain(int argc, _TCHAR* argv[])//_tmain,要加＃include <tchar.h>才能用
 	closesocket(server);
 	delete[] pszRecv;
 	WSACleanup();
+	fout.close();
 	system("pause");
 	return 0;
 }

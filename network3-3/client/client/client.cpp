@@ -1,4 +1,5 @@
 #include <Ws2tcpip.h>
+#include<stdlib.h>
 #include<stdio.h>
 #include<tchar.h>
 #include <iostream>
@@ -9,14 +10,18 @@
 #include <Windows.h>
 #include<cstring>
 #include<queue>
-#define RTO 500
+#define DELAY 20
+#define minn(x,y) (((x)>(y))?(y):(x))
+#define maxn(x,y) (((x)<(y))?(y):(x))
 #define PACKSIZE 64
 #define NAME "test.png"
-#define WINDOWSIZE 5
 using namespace std;
 
 #pragma comment(lib, "ws2_32.lib")
-//互斥锁
+int WINDOWSIZE = 20, RTO=200;
+int RTT = 100,SRTT=100;
+bool fast = false;
+int cwmd=1, ssthresh=10;
 HANDLE hMutex1;
 WSAData wsd;           //初始化信息
 SOCKET client;         //发送SOCKET
@@ -26,7 +31,7 @@ int dwSendSize = 0;
 int pszSend = 0,len, pack;
 unsigned long long Time;
 SOCKADDR_IN server, local;    //远程发送机地址和本机接收机地址
-int lentmp = sizeof(local);
+int lentmp = sizeof(local), lasttime = 0;
 queue<int> waiting;
 const char sk1 = 0x01;
 const char sk2 = 0x02;
@@ -132,53 +137,72 @@ void send_pack(char* txt, int len, int id)
 	delete[] pack;
 }
 char* p = new char[20000000];
-bool sendstat[20000000];
+int sendstat[20000000];
 int windowl, windowr;
 char** packtxt;
 bool out=true;
 int sendtime[20000000];
 DWORD WINAPI sendMessage(LPVOID lparam)
 {
+	bool O = true;
 	for (int i = 0; i <= windowr; ++i)
 		waiting.push(i);
 	int cnt = 0;
-	while(out)
+	while(O)
 	{
 		WaitForSingleObject(hMutex1, INFINITE);
-		queue<int> temp;
-		while(!waiting.empty())
+		for(int i=windowl;i<=windowr && i<pack;++i)
 		{
-			int i = waiting.front();
-			waiting.pop();
-			if (sendstat[i] == false && (sendtime[i]==0 || (sendtime[i]!=0 && Time-sendtime[i]>RTO)))
+			if (sendstat[i] ==0 && (sendtime[i] ==0 || (sendtime[i] != 0 && (Time-sendtime[i])>RTO)))
 			{
-				sendtime[i] = Time;
-				int txtlen = ((windowl + 1)* PACKSIZE > len) ? (len - windowl * PACKSIZE) : PACKSIZE;
-				send_pack(packtxt[windowl], txtlen, windowl);
-				cnt++;
-				cout << i << " send" << endl;
+				if (sendtime[i] != 0)
+				{
+					ssthresh = maxn(2,cwmd / 2);
+					cwmd = 1;
+				}
+			sendtime[i] = Time;
+			int txtlen = ((i + 1)* PACKSIZE > len) ? (len - i * PACKSIZE) : PACKSIZE;
+			_sleep(DELAY);
+			send_pack(packtxt[i], txtlen, i);
+			cnt++;
+			cout << i << " send "<<pack << endl;
 			}
-			temp.push(i);
 		}
-		while (!temp.empty())
-		{
-			int i = temp.front();
-			temp.pop();
-			waiting.push(i);
-		}
+		windowr = windowl + minn(WINDOWSIZE,cwmd) - 1;
+		if (sendstat[pack-1] == true)
+			O = false;
 		ReleaseMutex(hMutex1);
 	}
-	cout << "cnt " << cnt;
+	cout << "cnt " << cnt<<endl;
 	return 0;
 }
+int all = 0;
 DWORD WINAPI acceptMessage(LPVOID lparam)
 {
 	while (out)
 	{
 		nRet = recvfrom(client, pszRecv, 4096, 0, (SOCKADDR*)&server, &lentmp);
-		int id= ((unsigned char)pszRecv[2]) +((unsigned char)pszRecv[1])*256;
-		cout << id << " " << pack << endl;
-		sendstat[id] = true;
+		WaitForSingleObject(hMutex1, INFINITE);
+		all++;
+		if (cwmd > ssthresh)
+			cwmd++;
+		else
+			cwmd *= 2;
+		int id = ((unsigned char)pszRecv[2]) + ((unsigned char)pszRecv[1]) * 256;
+		RTT = Time/all;
+		SRTT = (8 * SRTT + 2 * RTT) / 10;
+		RTO = 10 * SRTT;
+		cout << id << endl<<" SRTT="<<SRTT<<endl;
+		if(id!=-1)
+			sendstat[id] ++;
+		if (sendstat[id] >= 3)
+		{
+			cwmd = maxn(2,cwmd/2);
+			ssthresh = cwmd;
+			cwmd += 3;
+			cwmd = ssthresh;
+		}
+		ReleaseMutex(hMutex1);
 	}
 	return 0;
 }
@@ -186,22 +210,24 @@ DWORD WINAPI windowmove(LPVOID lparam)
 {
 	while (out)
 	{
-		bool first = true;
-		if (sendstat[windowl])
+		WaitForSingleObject(hMutex1, INFINITE);
+		if (Time - lasttime > SRTT)
 		{
-			WaitForSingleObject(hMutex1, INFINITE);
+			if (cwmd <= ssthresh)
+				cwmd *= 2;
+			else
+				cwmd += 1;
+			lasttime = Time;
+		}
+		windowr = windowl + minn(WINDOWSIZE, cwmd) -1;
+		while(sendstat[windowl]!=0)
+		{
 			windowl++;
 			windowr++;
-			waiting.pop();
-			if ((first && windowl == pack - 1) || windowl!=pack-1)
-			{
-				waiting.push(windowr);
-				first = false;
-			}
 			if (windowl == pack-1)
 				out = false;
-			ReleaseMutex(hMutex1);
 		}
+		ReleaseMutex(hMutex1);
 	}
 	return 0;
 }
@@ -217,7 +243,7 @@ void send_file(char* filename)
 	cout << len;
 	int  i = 0;
 	packtxt = split_text(p, len);
-	windowl = 0, windowr = WINDOWSIZE - 1;
+	windowl = 0, windowr = minn(WINDOWSIZE, cwmd) - 1;
 	HANDLE hThread = CreateThread(NULL, NULL, acceptMessage, 0, 0, NULL);
 	HANDLE hThread2 = CreateThread(NULL, NULL, windowmove, 0, 0, NULL);
 	HANDLE hThread3 = CreateThread(NULL, NULL, sendMessage, 0, 0, NULL);
@@ -244,17 +270,19 @@ int init()
 	server.sin_port = htons(nPort);
 	server.sin_addr.S_un.S_addr = inet_addr("127.0.0.1");
 
-
 	pszRecv = new char[4096];
 	return 1;
 }
-
+int jl[1000000][5],ii=0;
 DWORD WINAPI timer(LPVOID lparam)
 {
 	while (true)
 	{
 		Sleep(1);
 		Time++;
+		if (Time % 10 == 0)
+			jl[ii][0] = Time, jl[ii][1] = SRTT, jl[ii][2] = cwmd, jl[ii][3] = ssthresh, jl[ii][4]=minn(WINDOWSIZE,cwmd),ii += 1;
+
 	}
 }
 
@@ -268,7 +296,11 @@ int main(int argc, _TCHAR* argv[])
 	send_file(file);
 	wave_hand();
 	closesocket(client);
+	cout << "total time:" << Time;
 	WSACleanup();
-
+	ofstream fout("data.txt", ofstream::out);
+	for(int i=0;i<ii;++i)
+		fout << jl[i][0] << " " << jl[i][1] << " " << jl[i][2] << " " << jl[i][3]  << " " << jl[i][4]<<endl;
+	fout.close();
 	return 0;
 }
