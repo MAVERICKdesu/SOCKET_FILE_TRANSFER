@@ -114,6 +114,7 @@ char** split_text(const char* txt, int len)
 
 void send_pack(char* txt, int len,int id)
 {
+	//Sleep(20);
 	if (id%10==0)
 		Sleep(RTO+RTO);
 	char* pack = new char[len + 5];

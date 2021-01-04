@@ -138,7 +138,7 @@ void recv_file()
 		if (check_checksum(pszRecv, nRet))
 		{
 			loss++;
-			if (loss % 20 == 0)
+			if (loss % 20 <0)
 				continue;
 			int xh = ((unsigned char)pszRecv[2]) + ((unsigned char)pszRecv[1]) * 256;
 			cout << "校验成功,返回ACK数据包 pack=" << xh << " txtlen=" << (int)pszRecv[3] << endl;

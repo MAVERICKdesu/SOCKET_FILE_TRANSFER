@@ -10,7 +10,7 @@
 #include <Windows.h>
 #include<cstring>
 #include<queue>
-#define DELAY 20
+#define DELAY 0
 #define minn(x,y) (((x)>(y))?(y):(x))
 #define maxn(x,y) (((x)<(y))?(y):(x))
 #define PACKSIZE 64
@@ -219,7 +219,7 @@ DWORD WINAPI windowmove(LPVOID lparam)
 				cwmd += 1;
 			lasttime = Time;
 		}
-		windowr = windowl + minn(WINDOWSIZE, cwmd) -1;
+		windowr = windowl + WINDOWSIZE -1;
 		while(sendstat[windowl]!=0)
 		{
 			windowl++;

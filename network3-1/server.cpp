@@ -96,7 +96,7 @@ static void setnonblocking(int sockfd) {
 		/* Handle failure. */
 	}
 }
-
+int loss = 0;
 void recv_file()
 {
 	//fstream makefile;
@@ -204,18 +204,18 @@ int init()
 	return 1;
 }
 
-/*DWORD WINAPI timer(LPVOID lparam)
+DWORD WINAPI timer(LPVOID lparam)
 {
 	while (true)
 	{
 		Sleep(1);
 		Time++;
 	}
-}*/
+}
 
 int _tmain(int argc, _TCHAR* argv[])//_tmain,要加＃include <tchar.h>才能用
 {
-	//HANDLE hThread = CreateThread(NULL, NULL, timer, 0, 0, NULL);
+	HANDLE hThread = CreateThread(NULL, NULL, timer, 0, 0, NULL);
 	init();
 	pszRecv = new char[4096];
 	dwSendSize = sizeof(client);
@@ -226,6 +226,7 @@ int _tmain(int argc, _TCHAR* argv[])//_tmain,要加＃include <tchar.h>才能用
 	closesocket(server);
 	delete[] pszRecv;
 	WSACleanup();
+	cout << Time;
 	system("pause");
 	return 0;
 }

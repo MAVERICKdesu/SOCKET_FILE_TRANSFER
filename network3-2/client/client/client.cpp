@@ -11,7 +11,7 @@
 #define RTO 20
 #define PACKSIZE 64
 #define NAME "test.png"
-#define WINDOWSIZE 20
+#define WINDOWSIZE 15
 using namespace std;
 
 #pragma comment(lib, "ws2_32.lib")

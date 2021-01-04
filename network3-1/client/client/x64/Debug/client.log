@@ -1,0 +1,7 @@
+﻿  client.cpp
+e:\myfiles\code\socket_file_transfer\network3-1\client\client\client.cpp(160): warning C4244: “初始化”: 从“unsigned __int64”转换到“int”，可能丢失数据
+e:\myfiles\code\socket_file_transfer\network3-1\client\client\client.cpp(190): warning C4554: “^”: 检查运算符优先级是否存在的可能的错误；使用括号阐明优先级
+e:\myfiles\code\socket_file_transfer\network3-1\client\client\client.cpp(222): warning C4996: 'inet_addr': Use inet_pton() or InetPton() instead or define _WINSOCK_DEPRECATED_NO_WARNINGS to disable deprecated API warnings
+  d:\windows kits\10\include\10.0.17763.0\um\winsock2.h(1831): note: 参见“inet_addr”的声明
+e:\myfiles\code\socket_file_transfer\network3-1\client\client\client.cpp(247): warning C4244: “参数”: 从“SOCKET”转换到“int”，可能丢失数据
+  client.vcxproj -> E:\MyFiles\Code\SOCKET_FILE_TRANSFER\network3-1\client\x64\Debug\client.exe

@@ -243,6 +243,7 @@ int _tmain(int argc, _TCHAR* argv[])//_tmain,要加＃include <tchar.h>才能用
 	closesocket(server);
 	delete[] pszRecv;
 	WSACleanup();
+	cout << Time;
 	system("pause");
 	return 0;
 }
